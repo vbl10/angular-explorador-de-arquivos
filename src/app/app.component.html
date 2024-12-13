@@ -34,6 +34,11 @@
         align-items: center;
         cursor: pointer;
         padding-left: 20px;
+
+        user-select: none; /* Disables text selection */
+        -webkit-user-select: none; /* For WebKit browsers (Chrome, Safari) */
+        -ms-user-select: none; /* For Internet Explorer/Edge */
+        -moz-user-select: none; /* For Firefox */
     }
     .conteudo > div.selecionado {
         background-color: lightcyan;
@@ -46,28 +51,80 @@
     <form (submit)="alterarCaminho()">
         <div style="display: grid; grid-template-columns: 0fr 1fr; gap: 10px;">
             <label for="inputCaminho">Caminho: </label>
-            <input type="text" id="inputCaminho" [(ngModel)]="caminho" [ngModelOptions]="{standalone: true}">
+            <input 
+                *ngIf="alterandoCaminho; else naoAlterandoCaminho"
+                type="text" 
+                id="inputCaminho" 
+                #inputCaminho
+                [(ngModel)]="novoCaminho" 
+                (blur)="novoCaminho = caminho; alterandoCaminho = false;"
+                (input)="erroNovoCaminho = '';"
+                [ngModelOptions]="{standalone: true}">
+            <ng-template #naoAlterandoCaminho>
+                <div (click)="aoClicarCaminho()">
+                    <span (dragover)="$event.preventDefault()" (drop)="moverPara('/')">/</span>
+                    <span 
+                        *ngFor="let segmendo of caminhoSegmentado; let i = index"
+                        (dragover)="$event.preventDefault()"
+                        (drop)="moverPara('/' + caminhoSegmentado.slice(0, i + 1).join('/'))">
+                        {{segmendo}}/
+                    </span>
+                </div>
+            </ng-template>
         </div>
+        <p style="color: lightcoral; margin: 5px">{{erroNovoCaminho}}</p>
     </form>
     <div class="toolbar">
-        <button [disabled]="selecao.size == 0" (click)="apagar()">apagar</button>
-        <button (click)="selecionarTudo()">selecionar tudo</button>
-        <button [disabled]="selecao.size != 1">renomear</button>
+        <button [disabled]="caminho == '/'" (click)="voltarPasta()">&lt;</button>
+        <button [disabled]="selecao.size == 0" (click)="apagarSelecao()">apagar</button>
+        <button (click)="selecionarTudo();">selecionar tudo</button>
+        <button [disabled]="selecao.size != 1" (click)="iniciarRenomeacao()">renomear</button>
     </div>
     <div class="conteudo">
-        <div *ngFor="let item of pegarPastas()" (click)="aoClicarItem(item)" [ngClass]="selecao.has(item) ? 'selecionado' : ''">
-            {{item}}
+        <div 
+            *ngIf="caminhoSegmentado.length > 0"
+            (dblclick)="voltarPasta()"
+            (dragover)="$event.preventDefault()"
+            (drop)="moverPara('../')">
+            ../
         </div>
-        <div *ngFor="let item of pegarAqruivos()" (click)="aoClicarItem(item)" [ngClass]="selecao.has(item) ? 'selecionado' : ''">
-            {{item}}
+        <div 
+            *ngFor="let pasta of pegarPastas()" 
+            (click)="aoClicarItem(pasta)" 
+            (dblclick)="abrirPasta(pasta)"
+            draggable="true"
+            (dragstart)="iniciarArrasto(pasta)"
+            (dragover)="$event.preventDefault()"
+            (drop)="moverPara(pasta)"
+            [ngClass]="selecao.has(pasta) ? 'selecionado' : ''">
+            <span *ngIf="renomeando != pasta; else campoRenomearPasta">{{pasta}}</span>
+            <ng-template #campoRenomearPasta>
+                <form (submit)="renomear()">
+                    <input type="text" [(ngModel)]="novoNome" #inputRenomear (blur)="renomeando = ''" [ngModelOptions]="{standalone: true}">
+                </form>
+            </ng-template>
+        </div>
+        <div 
+            *ngFor="let arquivo of pegarAqruivos()" 
+            (click)="aoClicarItem(arquivo)" 
+            (dblclick)="abrirArquivo(arquivo)"
+            draggable="true"
+            (dragstart)="iniciarArrasto(arquivo)"
+            [ngClass]="selecao.has(arquivo) ? 'selecionado' : ''">
+            <span *ngIf="renomeando != arquivo; else campoRenomearArquivo">{{arquivo}}</span>
+            <ng-template #campoRenomearArquivo>
+                <form (submit)="renomear()">
+                    <input type="text" [(ngModel)]="novoNome" #inputRenomear (blur)="renomeando = ''" [ngModelOptions]="{standalone: true}">
+                </form>
+            </ng-template>
         </div>
     </div>
     <div style="display: flex; justify-content: center;">
-        <button *ngIf="!criandoNovaPasta; else formCriarPasta" (click)="criandoNovaPasta = true">nova pasta</button>
+        <button *ngIf="!criandoNovaPasta; else formCriarPasta" (click)="iniciarCriarNovaPasta()">nova pasta</button>
         <ng-template #formCriarPasta>
             <div style="display: flex; gap: 10px">
                 <form (submit)="criarNovaPasta()" style="display: flex; gap: 10px">
-                    <input type="text" [(ngModel)]="novaPasta" [ngModelOptions]="{standalone: true}">
+                    <input type="text" [(ngModel)]="novaPasta" #inputNovaPasta [ngModelOptions]="{standalone: true}">
                     <button type="submit" [disabled]="novaPastaInvalida()">Ok</button>
                 </form>
                 <button (click)="criandoNovaPasta = false; novaPasta = ''">Cancelar</button>
@@ -75,7 +132,8 @@
         </ng-template>
     </div>
 </div>
-
+<pre>{{imprimirEstrutura()}}</pre>
+<pre>{{imprimirCaminho()}}</pre>
 <!--
 <router-outlet />
 -->
